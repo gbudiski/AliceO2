@@ -37,6 +37,7 @@ void HgcrocResponse::Init()
 
   LoadCalibLow(lowInjCalibData.Data());
   LoadCalibHigh(highInjCalibData.Data());
+  ValidateCalibParams();
 
   mInitialized = true;
 }
@@ -120,6 +121,47 @@ void HgcrocResponse::LoadCalibHigh(const std::string& filepath)
     mCalib[asic][ch].totConstHigh = totConstHigh;
     mCalib[asic][ch].totSlopeHigh = totSlopeHigh;
     mCalib[asic][ch].seenHigh = true;
+  }
+}
+
+// validates whether mCalibration parameters are valid or nonsense and sets badMask accordingly
+void HgcrocResponse::ValidateCalibParams()
+{
+  // sanity windows
+  const double adcSlopeMin = 2500., adcSlopeMax = 4500.;
+  const double totSlopeMin = 200., totSlopeMax = 550.;
+  const double totSlopeHighMin = 150., totSlopeHighMax = 300.;
+
+  for (int asic = 0; asic < NASICS; ++asic) {
+    for (int ch = 0; ch < NCHANNELS; ++ch) {
+      auto& c = mCalib[asic][ch];
+      c.badMask = 0;
+
+      if (!c.seenLow) {
+        c.badMask |= kBadADC | kBadTOTLow;
+        LOG(warning) << "focal::HgcrocResponse: ASIC " << asic << " channel " << ch << " did not receive calibration parameters for low charge injection fit, half mean will be used";
+      } else {
+        const double D = 1023. - c.adcConst - c.adcSlope * c.adcHighFit;
+        if (c.adcSlope < adcSlopeMin || c.adcSlope > adcSlopeMax || D <= 0) {
+          c.badMask |= kBadADC;
+          LOG(warning) << "focal::HgcrocResponse: ASIC " << asic << " channel " << ch << ": bad ADC fit (slope = " << c.adcSlope << ", D = " << D << "), will be replaced by the half mean";
+        }
+        if (c.totSlope < totSlopeMin || c.totSlope > totSlopeMax) {
+          c.badMask |= kBadTOTLow;
+          LOG(warning) << "focal::HgcrocResponse: ASIC " << asic << " channel " << ch << ": bad ToT low charge injection fit parameters (slope = " << c.totSlope << "), will be replaced by the half mean";
+        }
+      }
+
+      if (!c.seenHigh) {
+        c.badMask |= kBadTOTHigh;
+        LOG(warning) << "focal::HgcrocResponse: ASIC " << asic << " channel " << ch << " did not receive calibration parameters for high charge injection fit, half mean will be used";
+      } else {
+        if (c.totSlopeHigh < totSlopeHighMin || c.totSlopeHigh > totSlopeHighMax) {
+          c.badMask |= kBadTOTHigh;
+          LOG(warning) << "focal::HgcrocResponse: ASIC " << asic << " channel " << ch << ": bad ToT high charge injection fit parameters (slope = " << c.totSlopeHigh << "), will be replaced by the half mean";
+        }
+      }
+    }
   }
 }
 
