@@ -13,31 +13,45 @@
 #define ALICEO2_FOCAL_HGCROCRESPONSE_H_
 
 #include <array>
-#include "Rtypes.h"
+#include <string>
+#include <cstdint>
 
-namespace o2{
-namespace focal{
+namespace o2
+{
+namespace focal
+{
 
-class HgcrocResponse{
+class HgcrocResponse
+{
  public:
   static constexpr int NASICS = 18, NCHANNELS = 72;
 
-  // Container for the calibration parameters of each pad
+  // container for the calibration parameters of each pad
   struct ChannelCalib {
-  // raw, from the files
-  double adcConst = 0, adcSlope = 0, adcLowFit = 0, adcHighFit = 0;
-  double totConst = 0, totSlope = 0, totLowFit = 0, totHighFit = 0;
-  double totConstHigh = 0, totSlopeHigh = 0;
-  // derived, computed in init()
-  double G = 0, Qlin = 0, D = 0, Qsat = 0, Qtot = 0;
-  // bookkeeping:
-  bool seenLow = false, seenHigh = false;   // line found in each file
-  uint16_t replacedMask = 0;                // which constants were replaced by the half mean
+    double adcConst = 0, adcSlope = 0, adcLowFit = 0, adcHighFit = 0;
+    double totConst = 0, totSlope = 0, totLowFit = 0, totHighFit = 0;
+    double totConstHigh = 0, totSlopeHigh = 0;
+
+    double G = 0, Qlin = 0, D = 0, Qsat = 0, Qtot = 0;
+
+    bool seenLow = false, seenHigh = false; // calibration found in each file
+    uint16_t badMask = 0;                   // which constants were replaced by the half mean
+  };
+
+  // helper class to set badMask
+  enum CalibBits : uint16_t {
+    kBadADC = 1 << 0,
+    kBadTOTLow = 1 << 1,
+    kBadTOTHigh = 1 << 2
   };
 
   void Init();
+  std::array<std::array<ChannelCalib, NCHANNELS>, NASICS> getCalibParams() { return mCalib; }
 
  private:
+  void LoadCalibLow(const std::string& filepath);
+  void LoadCalibHigh(const std::string& filepath);
+
   std::array<std::array<ChannelCalib, NCHANNELS>, NASICS> mCalib;
   bool mInitialized = false;
 };
