@@ -18,6 +18,7 @@
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
+#include <vector>
 #include <filesystem>
 
 namespace o2::focal
@@ -38,6 +39,7 @@ void HgcrocResponse::Init()
   LoadCalibLow(lowInjCalibData.Data());
   LoadCalibHigh(highInjCalibData.Data());
   ValidateCalibParams();
+  RegularizeCalibParams();
 
   mInitialized = true;
 }
@@ -161,6 +163,80 @@ void HgcrocResponse::ValidateCalibParams()
           LOG(warning) << "focal::HgcrocResponse: ASIC " << asic << " channel " << ch << ": bad ToT high charge injection fit parameters (slope = " << c.totSlopeHigh << "), will be replaced by the half mean";
         }
       }
+    }
+  }
+}
+
+// replace the flagged groups of bad fit parameters by the mean of the good channels in the same ASIC half
+void HgcrocResponse::RegularizeCalibParams()
+{
+  using Param = double ChannelCalib::*;
+
+  const std::vector<Param> adcParams{&ChannelCalib::adcLowFit, &ChannelCalib::adcHighFit, &ChannelCalib::adcConst, &ChannelCalib::adcSlope};
+  const std::vector<Param> totLowParams{&ChannelCalib::totLowFit, &ChannelCalib::totHighFit, &ChannelCalib::totConst, &ChannelCalib::totSlope};
+  const std::vector<Param> totHighParams{&ChannelCalib::totConstHigh, &ChannelCalib::totSlopeHigh};
+
+  auto regularizeGroup = [this](int asic, int half, uint16_t bit, const std::vector<Param>& params) {
+    const int firstChannel = half * NCHANNELS / 2;
+    const int lastChannel = firstChannel + NCHANNELS / 2;
+
+    int nGood = 0;
+    std::vector<double> meanParams(params.size(), 0.);
+    std::vector<int> badChannels;
+
+    // calculating means over the good channels
+    for (int ch = firstChannel; ch < lastChannel; ++ch) {
+      const auto& c = mCalib[asic][ch];
+
+      if (c.badMask & bit) {
+        badChannels.push_back(ch);
+        continue;
+      }
+      for (size_t i = 0; i < params.size(); ++i) {
+        meanParams[i] += c.*params[i];
+      }
+
+      nGood++;
+    }
+
+    if (badChannels.empty())
+      return; // nothing to replace
+    if (nGood == 0) {
+      std::string group = "unknown fit group";
+      if (bit == kBadADC) {
+        group = "ADC fit";
+      } else if (bit == kBadTOTLow) {
+        group = "TOT low charge injection fit";
+      } else if (bit == kBadTOTHigh) {
+        group = "TOT high charge injection fit";
+      }
+      LOG(fatal) << "focal::HgcrocResponse: ASIC " << asic << " half " << half << " has no good channels to average for the " << group;
+    }
+
+    for (double& mean : meanParams) {
+      mean /= nGood;
+    }
+
+    // replacing bad parameter with the mean for the ASIC half
+    for (int ch : badChannels) {
+      auto& c = mCalib[asic][ch];
+      for (size_t i = 0; i < params.size(); ++i) {
+        c.*params[i] = meanParams[i];
+      }
+      if (bit == kBadADC) { // the half mean does not guarantee D > 0, so check it again after the substitution
+        const double D = 1023. - c.adcConst - c.adcSlope * c.adcHighFit;
+        if (D <= 0) {
+          LOG(fatal) << "focal::HgcrocResponse: the ADC fit parameters of ASIC " << asic << " half " << half << " are such that the dynamic range of the ADC is D <= 0 (D = " << D << ") after substitution of invalid fit parameters by half mean";
+        }
+      }
+    }
+  };
+
+  for (int asic = 0; asic < NASICS; ++asic) {
+    for (int half = 0; half < 2; ++half) {
+      regularizeGroup(asic, half, kBadADC, adcParams);
+      regularizeGroup(asic, half, kBadTOTLow, totLowParams);
+      regularizeGroup(asic, half, kBadTOTHigh, totHighParams);
     }
   }
 }
