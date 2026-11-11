@@ -51,6 +51,7 @@ class HgcrocResponse
  private:
   void LoadCalibLow(const std::string& filepath);
   void LoadCalibHigh(const std::string& filepath);
+  void ValidateCalibParams();
 
   std::array<std::array<ChannelCalib, NCHANNELS>, NASICS> mCalib;
   bool mInitialized = false;
