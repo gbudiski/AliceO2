@@ -26,3 +26,12 @@ o2_target_root_dictionary(
 
 o2_data_file(COPY geometryFiles  DESTINATION Detectors/Geometry/FOC/)
 o2_data_file(COPY data DESTINATION Detectors/FOC/simulation)
+
+
+
+
+o2_add_test(HgcrocResponse
+            SOURCES test/testHgcrocResponse.cxx
+            COMPONENT_NAME focal
+            LABELS focal
+            PUBLIC_LINK_LIBRARIES O2::FOCALSimulation)
