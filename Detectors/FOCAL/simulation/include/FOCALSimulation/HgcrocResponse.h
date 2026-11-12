@@ -24,7 +24,8 @@ namespace focal
 class HgcrocResponse
 {
  public:
-  static constexpr int NASICS = 18, NCHANNELS = 72;
+  static constexpr int NASICS = 18; // test-beam 2023 setup
+  static constexpr int NCHANNELS = 72;
   static constexpr int ADCMAX = 1023; // 10-bit ADC
 
   // sanity windows for the calibration fits (from the test-beam analysis)
@@ -38,30 +39,36 @@ class HgcrocResponse
     double totConst = 0, totSlope = 0, totLowFit = 0, totHighFit = 0;
     double totConstHigh = 0, totSlopeHigh = 0;
 
-    double G = 0, Qlin = 0, D = 0, Qsat = 0, Qtot = 0; // derived params (computed from the above)
+    // derived params (computed from the above)
+    double gain = 0;      // ADC counts per pC
+    double qLin = 0;      // end of the linear ADC range
+    double adcMargin = 0; // ADC counts left above the linear range
+    double qSat = 0;      // charge at which the ADC reaches ADCMAX
+    double qTOT = 0;      // charge at which the TOT starts
 
     bool seenLow = false, seenHigh = false; // calibration found in each file
     uint16_t badMask = 0;                   // which groups of fit parameters are bad (replaced by the half mean)
   };
 
   // bits used to set ChannelCalib::badMask, one per group of fit parameters
-  enum CalibBits : uint16_t {
-    kBadADC = 1 << 0,
-    kBadTOTLow = 1 << 1,
-    kBadTOTHigh = 1 << 2
+  enum BadCalibBits : uint16_t {
+    BadADCFit = 1 << 0,
+    BadTOTLowFit = 1 << 1,
+    BadTOTHighFit = 1 << 2
   };
 
-  void Init();
-  const std::array<std::array<ChannelCalib, NCHANNELS>, NASICS>& getCalibParams() const { return mCalib; }
+  void init();
+  bool isInitialized() const { return mInitialized; }
+  const std::array<std::array<ChannelCalib, NCHANNELS>, NASICS>& getCalibParams() const { return mCalibParams; }
 
  private:
-  void LoadCalibLow(const std::string& filepath);
-  void LoadCalibHigh(const std::string& filepath);
-  void ValidateCalibParams();
-  void RegularizeCalibParams();
-  void ComputeDerivedParams();
+  void loadCalibLow(const std::string& filepath);
+  void loadCalibHigh(const std::string& filepath);
+  void validateCalibParams();
+  void regularizeBadCalibParams();
+  void computeDerivedParams();
 
-  std::array<std::array<ChannelCalib, NCHANNELS>, NASICS> mCalib;
+  std::array<std::array<ChannelCalib, NCHANNELS>, NASICS> mCalibParams;
   bool mInitialized = false;
 };
 
