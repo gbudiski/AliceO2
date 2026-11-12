@@ -25,6 +25,12 @@ class HgcrocResponse
 {
  public:
   static constexpr int NASICS = 18, NCHANNELS = 72;
+  static constexpr int ADCMAX = 1023; // 10-bit ADC
+
+  // sanity windows for the calibration fits (from the test-beam analysis)
+  static constexpr double ADCSLOPE_MIN = 2500., ADCSLOPE_MAX = 4500.;
+  static constexpr double TOTSLOPE_MIN = 200., TOTSLOPE_MAX = 550.;
+  static constexpr double TOTSLOPEHIGH_MIN = 150., TOTSLOPEHIGH_MAX = 300.;
 
   // container for the calibration parameters of each pad
   struct ChannelCalib {
@@ -32,13 +38,13 @@ class HgcrocResponse
     double totConst = 0, totSlope = 0, totLowFit = 0, totHighFit = 0;
     double totConstHigh = 0, totSlopeHigh = 0;
 
-    double G = 0, Qlin = 0, D = 0, Qsat = 0, Qtot = 0;
+    double G = 0, Qlin = 0, D = 0, Qsat = 0, Qtot = 0; // derived params (computed from the above)
 
     bool seenLow = false, seenHigh = false; // calibration found in each file
-    uint16_t badMask = 0;                   // which constants were replaced by the half mean
+    uint16_t badMask = 0;                   // which groups of fit parameters are bad (replaced by the half mean)
   };
 
-  // helper class to set badMask
+  // bits used to set ChannelCalib::badMask, one per group of fit parameters
   enum CalibBits : uint16_t {
     kBadADC = 1 << 0,
     kBadTOTLow = 1 << 1,
@@ -46,13 +52,14 @@ class HgcrocResponse
   };
 
   void Init();
-  std::array<std::array<ChannelCalib, NCHANNELS>, NASICS> getCalibParams() { return mCalib; }
+  const std::array<std::array<ChannelCalib, NCHANNELS>, NASICS>& getCalibParams() const { return mCalib; }
 
  private:
   void LoadCalibLow(const std::string& filepath);
   void LoadCalibHigh(const std::string& filepath);
   void ValidateCalibParams();
   void RegularizeCalibParams();
+  void ComputeDerivedParams();
 
   std::array<std::array<ChannelCalib, NCHANNELS>, NASICS> mCalib;
   bool mInitialized = false;

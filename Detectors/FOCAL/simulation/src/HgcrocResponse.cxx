@@ -17,7 +17,6 @@
 
 #include <fstream>
 #include <sstream>
-#include <cstdlib>
 #include <vector>
 #include <filesystem>
 
@@ -40,6 +39,7 @@ void HgcrocResponse::Init()
   LoadCalibHigh(highInjCalibData.Data());
   ValidateCalibParams();
   RegularizeCalibParams();
+  ComputeDerivedParams();
 
   mInitialized = true;
 }
@@ -50,10 +50,10 @@ void HgcrocResponse::LoadCalibLow(const std::string& filepath)
   std::string line;
 
   if (!in) {
-    LOG(fatal) << "focal::HgcrocResponse: could not read calibration file: " << filepath;
+    LOG(fatal) << "focal::HgcrocResponse: cannot read calibration file: " << filepath;
   }
 
-  LOG(info) << "focal::HgcrocResponse: reading calibration file: " << filepath;
+  LOG(debug) << "focal::HgcrocResponse: reading calibration file: " << filepath;
 
   int asic, ch;
   double adcLowFit, adcHighFit, adcConst, adcSlope, totLowFit, totHighFit, totConst, totSlope;
@@ -94,10 +94,10 @@ void HgcrocResponse::LoadCalibHigh(const std::string& filepath)
   std::string line;
 
   if (!in) {
-    LOG(fatal) << "focal::HgcrocResponse: cannot read file " << filepath;
+    LOG(fatal) << "focal::HgcrocResponse: cannot read calibration file: " << filepath;
   }
 
-  LOG(info) << "focal::HgcrocResponse: reading calibration file: " << filepath;
+  LOG(debug) << "focal::HgcrocResponse: reading calibration file: " << filepath;
 
   int asic, ch;
   double totConstHigh, totSlopeHigh;
@@ -126,14 +126,9 @@ void HgcrocResponse::LoadCalibHigh(const std::string& filepath)
   }
 }
 
-// validates whether mCalibration parameters are valid or nonsense and sets badMask accordingly
+// validates whether calibration parameters are valid or nonsense and sets badMask accordingly
 void HgcrocResponse::ValidateCalibParams()
 {
-  // sanity windows
-  const double adcSlopeMin = 2500., adcSlopeMax = 4500.;
-  const double totSlopeMin = 200., totSlopeMax = 550.;
-  const double totSlopeHighMin = 150., totSlopeHighMax = 300.;
-
   for (int asic = 0; asic < NASICS; ++asic) {
     for (int ch = 0; ch < NCHANNELS; ++ch) {
       auto& c = mCalib[asic][ch];
@@ -143,12 +138,12 @@ void HgcrocResponse::ValidateCalibParams()
         c.badMask |= kBadADC | kBadTOTLow;
         LOG(warning) << "focal::HgcrocResponse: ASIC " << asic << " channel " << ch << " did not receive calibration parameters for low charge injection fit, half mean will be used";
       } else {
-        const double D = 1023. - c.adcConst - c.adcSlope * c.adcHighFit;
-        if (c.adcSlope < adcSlopeMin || c.adcSlope > adcSlopeMax || D <= 0) {
+        const double D = ADCMAX - c.adcConst - c.adcSlope * c.adcHighFit;
+        if (c.adcSlope < ADCSLOPE_MIN || c.adcSlope > ADCSLOPE_MAX || D <= 0) {
           c.badMask |= kBadADC;
           LOG(warning) << "focal::HgcrocResponse: ASIC " << asic << " channel " << ch << ": bad ADC fit (slope = " << c.adcSlope << ", D = " << D << "), will be replaced by the half mean";
         }
-        if (c.totSlope < totSlopeMin || c.totSlope > totSlopeMax) {
+        if (c.totSlope < TOTSLOPE_MIN || c.totSlope > TOTSLOPE_MAX) {
           c.badMask |= kBadTOTLow;
           LOG(warning) << "focal::HgcrocResponse: ASIC " << asic << " channel " << ch << ": bad ToT low charge injection fit parameters (slope = " << c.totSlope << "), will be replaced by the half mean";
         }
@@ -158,7 +153,7 @@ void HgcrocResponse::ValidateCalibParams()
         c.badMask |= kBadTOTHigh;
         LOG(warning) << "focal::HgcrocResponse: ASIC " << asic << " channel " << ch << " did not receive calibration parameters for high charge injection fit, half mean will be used";
       } else {
-        if (c.totSlopeHigh < totSlopeHighMin || c.totSlopeHigh > totSlopeHighMax) {
+        if (c.totSlopeHigh < TOTSLOPEHIGH_MIN || c.totSlopeHigh > TOTSLOPEHIGH_MAX) {
           c.badMask |= kBadTOTHigh;
           LOG(warning) << "focal::HgcrocResponse: ASIC " << asic << " channel " << ch << ": bad ToT high charge injection fit parameters (slope = " << c.totSlopeHigh << "), will be replaced by the half mean";
         }
@@ -206,9 +201,9 @@ void HgcrocResponse::RegularizeCalibParams()
       if (bit == kBadADC) {
         group = "ADC fit";
       } else if (bit == kBadTOTLow) {
-        group = "TOT low charge injection fit";
+        group = "ToT low charge injection fit";
       } else if (bit == kBadTOTHigh) {
-        group = "TOT high charge injection fit";
+        group = "ToT high charge injection fit";
       }
       LOG(fatal) << "focal::HgcrocResponse: ASIC " << asic << " half " << half << " has no good channels to average for the " << group;
     }
@@ -224,9 +219,9 @@ void HgcrocResponse::RegularizeCalibParams()
         c.*params[i] = meanParams[i];
       }
       if (bit == kBadADC) { // the half mean does not guarantee D > 0, so check it again after the substitution
-        const double D = 1023. - c.adcConst - c.adcSlope * c.adcHighFit;
+        const double D = ADCMAX - c.adcConst - c.adcSlope * c.adcHighFit;
         if (D <= 0) {
-          LOG(fatal) << "focal::HgcrocResponse: the ADC fit parameters of ASIC " << asic << " half " << half << " are such that the dynamic range of the ADC is D <= 0 (D = " << D << ") after substitution of invalid fit parameters by half mean";
+          LOG(fatal) << "focal::HgcrocResponse: the ADC fit parameters of ASIC " << asic << " half " << half  << " leave no ADC counts above the linear range (D = " << D << " <= 0) after substitution of invalid fit parameters by half mean";
         }
       }
     }
@@ -237,6 +232,21 @@ void HgcrocResponse::RegularizeCalibParams()
       regularizeGroup(asic, half, kBadADC, adcParams);
       regularizeGroup(asic, half, kBadTOTLow, totLowParams);
       regularizeGroup(asic, half, kBadTOTHigh, totHighParams);
+    }
+  }
+}
+
+void HgcrocResponse::ComputeDerivedParams()
+{
+  const PadSimParam& pars = PadSimParam::Instance();
+
+  for (auto& row : mCalib) {
+    for (auto& c : row) {
+      c.G = c.adcSlope;
+      c.Qlin = c.adcHighFit;
+      c.D = ADCMAX - c.adcConst - c.G * c.Qlin;
+      c.Qsat = c.Qlin + 2 * c.D / c.G;
+      c.Qtot = c.Qsat + pars.getADCTOTGap();
     }
   }
 }
