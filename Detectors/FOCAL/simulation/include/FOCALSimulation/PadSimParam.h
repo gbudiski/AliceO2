@@ -32,8 +32,8 @@ class PadSimParam : public o2::conf::ConfigurableParamHelper<PadSimParam>
 
   Float_t getEnergyPerPair() const { return mEnergyPerPair; }
   Float_t getCCE() const { return mCCE; }
-  const std::string& getCalibFileLow() const { return mCalibFileLow; }
-  const std::string& getCalibFileHigh() const { return mCalibFileHigh; }
+  const std::string& getCalibFileLowRange() const { return mCalibFileLowRange; }
+  const std::string& getCalibFileHighRange() const { return mCalibFileHighRange; }
   Float_t getADCTOTGap() const { return mADCTOTGap; }
   Float_t getTOTTransitionLow() const { return mTOTTransitionLow; }
   Float_t getTOTTransitionHigh() const { return mTOTTransitionHigh; }
@@ -52,8 +52,8 @@ class PadSimParam : public o2::conf::ConfigurableParamHelper<PadSimParam>
  private:
   Float_t mEnergyPerPair{3.65};
   Float_t mCCE{1.0};
-  std::string mCalibFileLow{"${O2_ROOT}/share/Detectors/FOC/simulation/data/FOCALEPads_Calibration_20230208.txt"};
-  std::string mCalibFileHigh{"${O2_ROOT}/share/Detectors/FOC/simulation/data/calib_highinjection_pdfextracted.txt"};
+  std::string mCalibFileLowRange{"${O2_ROOT}/share/Detectors/FOC/simulation/data/FOCALEPads_Calibration_20230208.txt"};
+  std::string mCalibFileHighRange{"${O2_ROOT}/share/Detectors/FOC/simulation/data/calib_highinjection_pdfextracted.txt"};
   Float_t mADCTOTGap{0.1};
   Float_t mTOTTransitionLow{0.5};
   Float_t mTOTTransitionHigh{2.0};

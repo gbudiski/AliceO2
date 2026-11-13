@@ -32,13 +32,13 @@ void HgcrocResponse::init()
 
   const PadSimParam& pars = PadSimParam::Instance();
 
-  TString lowInjCalibData = pars.getCalibFileLow();
-  gSystem->ExpandPathName(lowInjCalibData);
-  TString highInjCalibData = pars.getCalibFileHigh();
-  gSystem->ExpandPathName(highInjCalibData);
+  TString lowRangeCalibData = pars.getCalibFileLowRange();
+  gSystem->ExpandPathName(lowRangeCalibData);
+  TString highRangeCalibData = pars.getCalibFileHighRange();
+  gSystem->ExpandPathName(highRangeCalibData);
 
-  loadCalibLow(lowInjCalibData.Data());
-  loadCalibHigh(highInjCalibData.Data());
+  loadCalibLowRange(lowRangeCalibData.Data());
+  loadCalibHighRange(highRangeCalibData.Data());
   validateCalibParams();
   regularizeBadCalibParams();
   computeDerivedParams();
@@ -46,7 +46,7 @@ void HgcrocResponse::init()
   mInitialized = true;
 }
 
-void HgcrocResponse::loadCalibLow(const std::string& filepath)
+void HgcrocResponse::loadCalibLowRange(const std::string& filepath)
 {
   std::ifstream in(filepath);
   std::string line;
@@ -58,7 +58,7 @@ void HgcrocResponse::loadCalibLow(const std::string& filepath)
   LOG(debug) << "focal::HgcrocResponse: reading calibration file: " << filepath;
 
   int asic, ch;
-  double adcLowFit, adcHighFit, adcConst, adcSlope, totLowFit, totHighFit, totConst, totSlope;
+  double adcLowerFitRange, adcHigherFitRange, adcConst, adcSlope, totLowerFitRange, totHigherFitRange, totConst, totSlope;
   int lineNum = 0;
 
   while (std::getline(in, line)) {
@@ -69,7 +69,7 @@ void HgcrocResponse::loadCalibLow(const std::string& filepath)
 
     std::istringstream ss(line);
 
-    if (!(ss >> asic >> ch >> adcLowFit >> adcHighFit >> adcConst >> adcSlope >> totLowFit >> totHighFit >> totConst >> totSlope)) {
+    if (!(ss >> asic >> ch >> adcLowerFitRange >> adcHigherFitRange >> adcConst >> adcSlope >> totLowerFitRange >> totHigherFitRange >> totConst >> totSlope)) {
       LOG(fatal) << "focal::HgcrocResponse: " << std::filesystem::path(filepath).filename().string() << ":"
                  << lineNum << ": error parsing line";
     }
@@ -82,19 +82,19 @@ void HgcrocResponse::loadCalibLow(const std::string& filepath)
                  << " has received more than one calibration entry from " << std::filesystem::path(filepath).filename().string();
     }
 
-    mCalibParams[asic][ch].adcLowFit = adcLowFit;
-    mCalibParams[asic][ch].adcHighFit = adcHighFit;
+    mCalibParams[asic][ch].adcLowerFitRange = adcLowerFitRange;
+    mCalibParams[asic][ch].adcHigherFitRange = adcHigherFitRange;
     mCalibParams[asic][ch].adcConst = adcConst;
     mCalibParams[asic][ch].adcSlope = adcSlope;
-    mCalibParams[asic][ch].totLowFit = totLowFit;
-    mCalibParams[asic][ch].totHighFit = totHighFit;
+    mCalibParams[asic][ch].totLowerFitRange = totLowerFitRange;
+    mCalibParams[asic][ch].totHigherFitRange = totHigherFitRange;
     mCalibParams[asic][ch].totConst = totConst;
     mCalibParams[asic][ch].totSlope = totSlope;
     mCalibParams[asic][ch].seenLow = true;
   }
 }
 
-void HgcrocResponse::loadCalibHigh(const std::string& filepath)
+void HgcrocResponse::loadCalibHighRange(const std::string& filepath)
 {
   std::ifstream in(filepath);
   std::string line;
@@ -149,7 +149,7 @@ void HgcrocResponse::validateCalibParams()
         LOG(warning) << "focal::HgcrocResponse: ASIC " << asic << " channel " << ch
                      << " did not receive calibration parameters for low charge injection fit, half mean will be used";
       } else {
-        const double adcMargin = ADCMAX - c.adcConst - c.adcSlope * c.adcHighFit;
+        const double adcMargin = ADCMAX - c.adcConst - c.adcSlope * c.adcHigherFitRange;
         if (c.adcSlope < ADCSLOPE_MIN || c.adcSlope > ADCSLOPE_MAX || adcMargin <= 0) {
           c.badMask |= BadADCFit;
           LOG(warning) << "focal::HgcrocResponse: ASIC " << asic << " channel " << ch
@@ -182,8 +182,8 @@ void HgcrocResponse::regularizeBadCalibParams()
 {
   using Param = double ChannelCalib::*;
 
-  const std::vector<Param> adcParams{&ChannelCalib::adcLowFit, &ChannelCalib::adcHighFit, &ChannelCalib::adcConst, &ChannelCalib::adcSlope};
-  const std::vector<Param> totLowParams{&ChannelCalib::totLowFit, &ChannelCalib::totHighFit, &ChannelCalib::totConst, &ChannelCalib::totSlope};
+  const std::vector<Param> adcParams{&ChannelCalib::adcLowerFitRange, &ChannelCalib::adcHigherFitRange, &ChannelCalib::adcConst, &ChannelCalib::adcSlope};
+  const std::vector<Param> totLowParams{&ChannelCalib::totLowerFitRange, &ChannelCalib::totHigherFitRange, &ChannelCalib::totConst, &ChannelCalib::totSlope};
   const std::vector<Param> totHighParams{&ChannelCalib::totConstHigh, &ChannelCalib::totSlopeHigh};
 
   auto regularizeGroup = [this](int asic, int half, uint16_t bit, const std::vector<Param>& params) {
@@ -235,7 +235,7 @@ void HgcrocResponse::regularizeBadCalibParams()
         c.*params[i] = meanParams[i];
       }
       if (bit == BadADCFit) { // the half mean does not guarantee adcMargin > 0, so check it again after the substitution
-        const double adcMargin = ADCMAX - c.adcConst - c.adcSlope * c.adcHighFit;
+        const double adcMargin = ADCMAX - c.adcConst - c.adcSlope * c.adcHigherFitRange;
         if (adcMargin <= 0) {
           LOG(fatal) << "focal::HgcrocResponse: the ADC fit parameters of ASIC " << asic << " half " << half
                      << " leave no ADC counts above the linear range (adcMargin = "
@@ -261,7 +261,7 @@ void HgcrocResponse::computeDerivedParams()
   for (auto& row : mCalibParams) {
     for (auto& c : row) {
       c.gain = c.adcSlope;
-      c.qLin = c.adcHighFit;
+      c.qLin = c.adcHigherFitRange;
       c.adcMargin = ADCMAX - c.adcConst - c.gain * c.qLin;
       c.qSat = c.qLin + 2 * c.adcMargin / c.gain;
       c.qTOT = c.qSat + pars.getADCTOTGap();

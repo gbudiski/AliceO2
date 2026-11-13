@@ -35,16 +35,23 @@ class HgcrocResponse
 
   // container for the calibration parameters of each pad
   struct ChannelCalib {
-    double adcConst = 0, adcSlope = 0, adcLowFit = 0, adcHighFit = 0;
-    double totConst = 0, totSlope = 0, totLowFit = 0, totHighFit = 0;
-    double totConstHigh = 0, totSlopeHigh = 0;
+    double adcConst = 0;          // ADC fit constant
+    double adcSlope = 0;          // ADC fit slope
+    double adcLowerFitRange = 0;  // lower bound (in pC) for ADC fit
+    double adcHigherFitRange = 0; // upper bound (in pC) for ADC fit
+    double totConst = 0;          // ToT fit constant for low range fit
+    double totSlope = 0;          // ToT fit slope for low range fit
+    double totLowerFitRange = 0;  // lower bound (in pC) for ToT fit
+    double totHigherFitRange = 0; // upper bound (in pC) for ToT fit
+    double totConstHigh = 0;      // ToT fit constant for high range fit
+    double totSlopeHigh = 0;      // ToT fit slope for high range fit
 
-    // derived params (computed from the above)
+    // derived parameters (computed from the above)
     double gain = 0;      // ADC counts per pC
     double qLin = 0;      // end of the linear ADC range
     double adcMargin = 0; // ADC counts left above the linear range
-    double qSat = 0;      // charge at which the ADC reaches ADCMAX
-    double qTOT = 0;      // charge at which the TOT starts
+    double qSat = 0;      // charge at which ADC reaches ADCMAX
+    double qTOT = 0;      // charge at which TOT starts
 
     bool seenLow = false, seenHigh = false; // calibration found in each file
     uint16_t badMask = 0;                   // which groups of fit parameters are bad (replaced by the half mean)
@@ -62,8 +69,8 @@ class HgcrocResponse
   const std::array<std::array<ChannelCalib, NCHANNELS>, NASICS>& getCalibParams() const { return mCalibParams; }
 
  private:
-  void loadCalibLow(const std::string& filepath);
-  void loadCalibHigh(const std::string& filepath);
+  void loadCalibLowRange(const std::string& filepath);
+  void loadCalibHighRange(const std::string& filepath);
   void validateCalibParams();
   void regularizeBadCalibParams();
   void computeDerivedParams();
