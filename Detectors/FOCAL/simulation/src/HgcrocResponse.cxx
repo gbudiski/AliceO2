@@ -270,8 +270,8 @@ void HgcrocResponse::flagDeadTOTHalves()
         mCalibParams[asic][ch].badFitMask |= badTOTBit;
       }
 
-      LOG(debug) << "focal::HgcrocResponse: ASIC " << asic << " half " << half << " has " << nBadTOT << "/" << nChannelsHalf << " channels with a bad ToT fit, "
-                 << "all its ToT fits are flagged as bad (dead ToT half)";
+      LOG(warning) << "focal::HgcrocResponse: ASIC " << asic << " half " << half << " has " << nBadTOT << "/" << nChannelsHalf << " channels with a bad ToT fit "
+                   << "(dead ToT), all its ToT fits are replaced by the mean of the other half where available";
     }
   }
 }
