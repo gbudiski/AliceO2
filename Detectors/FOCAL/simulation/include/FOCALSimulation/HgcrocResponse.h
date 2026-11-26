@@ -45,7 +45,7 @@ class HgcrocResponse
     double qTOT = 0;      // charge at which TOT starts
 
     bool seenLow = false, seenHigh = false; // calibration found in each file
-    uint16_t badFitMask = 0;                // which groups of fit parameters are bad (replaced by the half mean)
+    uint16_t badFitMask = 0;                // which groups of fit parameters are bad (replaced by mean of good channels)
   };
 
   // bits used to set ChannelCalib::badFitMask, one per group of fit parameters
@@ -66,10 +66,10 @@ class HgcrocResponse
     float mTOTSlopeMax{0.f};
     float mTOTSlopeHighRangeMin{0.f};
     float mTOTSlopeHighRangeMax{0.f};
-    float mADCHighFitMin{0.f};
-    float mADCHighFitMax{0.f};
     float mTOTLowFitMin{0.f};
-    float mTOTLowFitMax{0.f};
+    double mTOTHighRangeDefaultSlope{0.};
+    double mTOTHighRangeDefaultConst{0.};
+    float mTOTBadHalfFraction{0.f};
     std::string mCalibFileLowRange;
     std::string mCalibFileHighRange;
   };
@@ -84,6 +84,7 @@ class HgcrocResponse
   void loadCalibLowRange(const std::string& filepath);
   void loadCalibHighRange(const std::string& filepath);
   void validateCalibParams();
+  void flagDeadTOTHalves();
   void regularizeBadCalibParams();
   void computeDerivedParams();
 

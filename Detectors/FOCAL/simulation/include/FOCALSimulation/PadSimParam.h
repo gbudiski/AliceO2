@@ -54,6 +54,10 @@ class PadSimParam : public o2::conf::ConfigurableParamHelper<PadSimParam>
   float getTOTSlopeMax() const { return mTOTSlopeMax; }
   float getTOTSlopeHighRangeMin() const { return mTOTSlopeHighRangeMin; }
   float getTOTSlopeHighRangeMax() const { return mTOTSlopeHighRangeMax; }
+  float getTOTLowFitMin() const { return mTOTLowFitMin; }
+  double getTOTHighRangeDefaultSlope() const { return mTOTHighRangeDefaultSlope; }
+  double getTOTHighRangeDefaultConst() const { return mTOTHighRangeDefaultConst; }
+  float getTOTBadHalfFraction() const { return mTOTBadHalfFraction; }
 
   float mEnergyPerPair{3.65f};
   float mCCE{1.0f};
@@ -80,10 +84,10 @@ class PadSimParam : public o2::conf::ConfigurableParamHelper<PadSimParam>
   float mTOTSlopeMax{550.f};
   float mTOTSlopeHighRangeMin{150.f};
   float mTOTSlopeHighRangeMax{300.f};
-  float mADCHighFitMin{0.15f}; // min. value for upper charge limit of ADC fit
-  float mADCHighFitMax{0.25f}; // max. value for upper charge limit of ADC fit
-  float mTOTLowFitMin{0.15f};  // min. value for lower charge limit of ToT fit
-  float mTOTLowFitMax{0.35f};  // max. value for lower charge limit of ToT fit
+  float mTOTLowFitMin{0.05f}; // min. value for start of ToT range
+  double mTOTHighRangeDefaultSlope{260.};
+  double mTOTHighRangeDefaultConst{100.};
+  float mTOTBadHalfFraction{0.75f}; // fraction of channels with a bad ToT fit at which the whole half's ToT is flagged (dead ToT half)
 
   void PrintStream(std::ostream& stream) const;
 
